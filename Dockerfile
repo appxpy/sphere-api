@@ -12,18 +12,9 @@ COPY . .
 
 # Build the Go application
 RUN go build -o main ./cmd/main
-
-# Create a minimal image for running the app
-FROM alpine:3.14
-
-# Set the working directory inside the deployable image
-WORKDIR /app
-
-# Copy the compiled executable from the builder stage
-COPY --from=builder /app/main .
+RUN chmod +x /app/main
 
 # Expose the port on which the app will run
 EXPOSE 8080
 
-# Command to run the app
-CMD ["main"]
+ENTRYPOINT ["/app/main"]
