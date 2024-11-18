@@ -3,6 +3,7 @@ package websocket
 import (
 	"math/rand"
 	"net/http"
+	"time"
 
 	"github.com/appxpy/sphere-api/internal/logging"
 	"github.com/appxpy/sphere-api/internal/models"
@@ -19,8 +20,10 @@ type Handler struct {
 
 	geolocationAPI *api.GeolocationWebsocketAPI
 
-	state  int
-	router *Router
+	state        int
+	router       *Router
+	pingInterval time.Duration
+	pingTimeout  time.Duration
 }
 
 func NewHandler(geoUsecase *usecases.GeolocationUsecase, usersUsecase *usecases.UsersUsecase) *Handler {
@@ -37,6 +40,8 @@ func NewHandler(geoUsecase *usecases.GeolocationUsecase, usersUsecase *usecases.
 		},
 		geolocationAPI: api.NewGeolocationWebsocketAPI(geoUsecase, usersUsecase),
 		router:         NewRouter(),
+		pingInterval:   10 * time.Second,
+		pingTimeout:    5 * time.Second,
 	}
 
 	users := api.NewUsersWebsocketAPI(usersUsecase)
@@ -67,18 +72,47 @@ func (h *Handler) HandleWS(w http.ResponseWriter, r *http.Request) {
 	client := &models.ClientInfo{Connection: conn, ID: clientID, SphereID: sphereID}
 	h.usersUsecase.AddClient(client)
 
+	go h.pingClients(client)
+
 	for {
 		_, msg, errInner := conn.ReadMessage()
 		if errInner != nil {
 			logging.ErrorLogger.Printf("Error reading message: %v", errInner)
-			h.usersUsecase.RemoveClient(clientID)
-			notify := h.geoUsecase.UpdateRelatedClients(clientID)
-			h.geoUsecase.DeleteClientFromNearestReferences(clientID)
-			h.geolocationAPI.NotifyAboutChangedNearestClient(notify)
+			h.removeClient(clientID)
 			break
 		}
 		if err := h.router.Route(conn, msg); err != nil {
 			logging.ErrorLogger.Printf("Error routing message: %v\nMessage: %v", err, string(msg))
+		}
+	}
+}
+
+func (h *Handler) removeClient(clientID string) {
+	h.usersUsecase.RemoveClient(clientID)
+	notify := h.geoUsecase.UpdateRelatedClients(clientID)
+	h.geoUsecase.DeleteClientFromNearestReferences(clientID)
+	h.geolocationAPI.NotifyAboutChangedNearestClient(notify)
+}
+
+func (h *Handler) pingClients(client *models.ClientInfo) {
+	ticker := time.NewTicker(h.pingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			logging.InfoLogger.Printf("Sending ping message to %s", client.ID)
+			if err := client.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
+				logging.ErrorLogger.Printf("Failed to send ping to client %s: %v", client.ID, err)
+				h.removeClient(client.ID)
+				return
+			}
+
+			client.Connection.SetReadDeadline(time.Now().Add(h.pingTimeout))
+			client.Connection.SetPongHandler(func(appData string) error {
+				client.Connection.SetReadDeadline(time.Time{})
+				return nil
+			})
 		}
 	}
 }
