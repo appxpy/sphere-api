@@ -105,18 +105,11 @@ func (h *Handler) pingClients(client *models.ClientInfo) {
 	for {
 		select {
 		case <-ticker.C:
-			logging.InfoLogger.Printf("Sending ping message to %s", client.ID)
-			if err := client.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
-				logging.ErrorLogger.Printf("Failed to send ping to client %s: %v", client.ID, err)
+			if err := client.Connection.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(h.pingTimeout)); err != nil {
+				logging.ErrorLogger.Printf("Error sending ping to client %s: %v", client.ID, err)
 				h.removeClient(client.ID)
 				return
 			}
-
-			client.Connection.SetReadDeadline(time.Now().Add(h.pingTimeout))
-			client.Connection.SetPongHandler(func(appData string) error {
-				client.Connection.SetReadDeadline(time.Time{})
-				return nil
-			})
 		}
 	}
 }
