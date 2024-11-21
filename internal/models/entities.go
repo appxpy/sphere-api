@@ -27,3 +27,12 @@ type GetNearestClientResponse struct {
 	Azimuth  float64 `json:"azimuth"`
 	Distance float64 `json:"distance"`
 }
+
+type SyncStateMessage struct {
+	TransitionProgress    float64 `json:"transitionProgress"`
+	TransitionDirection   int     `json:"transitionDirection"`
+	TransitionElapsedTime float64 `json:"transitionElapsedTime"`
+	TransitionTimer       float64 `json:"transitionTimer"`
+	HeartRedness          float64 `json:"heartRedness"`
+	StateVersion          int     `json:"stateVersion"`
+}

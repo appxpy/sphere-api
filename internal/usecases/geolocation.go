@@ -144,6 +144,10 @@ func (u *GeolocationUsecase) GetClosestClient(clientID string) (*models.ClientIn
 	return u.repo.FindNearestClient(clientID)
 }
 
+func (u *GeolocationUsecase) GetClientsWhoReferenceClientAsNearest(clientID string) []string {
+	return u.repo.WhoReferenceMeAsNearest(clientID)
+}
+
 // Пересчитывает азимут и расстояние между двумя клиентами
 func calculateAzimuthAndDistanceBetweenPositions(clientA *models.ClientInfo, clientB *models.ClientInfo) (distance, azimuthAtoB, azimuthBtoA float64) {
 	geodesic.WGS84.Inverse(clientA.Position.Latitude, clientA.Position.Longitude,

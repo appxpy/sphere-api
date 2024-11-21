@@ -45,6 +45,7 @@ func NewHandler(geoUsecase *usecases.GeolocationUsecase, usersUsecase *usecases.
 	}
 
 	users := api.NewUsersWebsocketAPI(usersUsecase)
+	sync := api.NewSyncWebsocketAPI(usersUsecase, geoUsecase)
 
 	// Users API
 	handler.router.Handle("WhoAmIRequest", users.HandleWhoAmI)
@@ -53,6 +54,9 @@ func NewHandler(geoUsecase *usecases.GeolocationUsecase, usersUsecase *usecases.
 
 	// Geolocation API
 	handler.router.Handle("UpdatePositionRequest", handler.geolocationAPI.HandleUpdatePosition)
+
+	// Sync API
+	handler.router.Handle("SyncStateMessage", sync.HandleSyncStateMessage)
 
 	return handler
 }
